@@ -3,13 +3,19 @@
 - 首页
 - 登录页面
 - 注册页面
+- USE GIN TO REBUILD
+
+- token验证 handler/user.go IsTokenValid
 
 ## 开发日志/技术总结 
 
-GoCloud文件储存服务大体原理
+使用go的http包，未使用框架，只为更好理解底层原理
+
+### 杂项
 
 - 每个文件通过哈希在服务器中保存一份
     * 因此需要检测已存在
+- 为了方便外部访问往往在方法(包)内部处理好并创建对应的结构体给外部
 
 ### 技术栈
 
@@ -50,6 +56,19 @@ GoCloud文件储存服务大体原理
         + 基于session，cookie
 - 用户资源隔离
     * 有可能云端只储存了一份文件，一个用户删除了他的云文件不会影响到别人的云文件
+
+
+#### 秒传
+
+原理：要上传的文件之前已经有人上传过了。
+
+- 关键点
+    * 文件哈希值
+    * 用户文件关联
+        + 用户文件表
+            + 软删除(文件状态)，资源隔离
+            + 通过用户文件表链接到唯一文件表，取出存储地址
+        + 唯一文件表
 
 
 ### API使用
@@ -119,6 +138,38 @@ w.Header().Set("Content-Disposition", "attachment;filename=\""+fm.FileName+"\"")
 - 更新/删除系统中的数据
     * 删除操作需要考虑线程安全问题
 - 更新/删除内存中的数据
+
+
+##### JSON
+
+需要携带的数据变多，结构复杂时，转换成json类型的字节就传输给浏览器
+
+`r, err := json.Marshal(struct)`
+
+
+##### 拦截器
+
+使用拦截器，验证token。**拦截器原理类似闭包**：传入什么传出什么，但在中间过程做了些验证
+
+```go
+func Validator(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			if len(username) < 3{
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			h(w, r)
+		},
+	)
+}
+
+http.HandleFunc("/user/info", Validator(UserHandler))
+```
+
+- 把一些校验逻辑抽成拦截器
+    * handler里就可以专心处理业务了
+    * 代码复用，避免handler里验证各自为政
 
 
 #### Time
