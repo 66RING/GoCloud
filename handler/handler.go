@@ -1,6 +1,7 @@
 package handler
 
 import (
+	dblayer "GoCloud/db"
 	"GoCloud/meta"
 	"GoCloud/util"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -50,12 +52,22 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// 计算较大文件哈希耗时较长，影响上传速度和用户体验。可以抽离出来做微服务，然后进行异步处理
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
 		// meta.UpdateFileMeta(fileMeta)
 		_ = meta.UpdateFileMetaDB(fileMeta)
 
-		http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
+		// 写唯一文件表同时写用户文件表 //
+		r.ParseForm()
+		username := r.Form.Get("username")
+		suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1,
+			fileMeta.FileName, fileMeta.FileSize)
+		if suc {
+			http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
+		} else {
+			w.Write([]byte("Upload Failed."))
+		}
 	}
 }
 
@@ -75,6 +87,25 @@ func GetFileMetaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := json.Marshal(fMeta)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+}
+
+// 查询批量的文件元信息
+func FileQueryHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	limitCnt, _ := strconv.Atoi(r.Form.Get("limit"))
+	username := r.Form.Get("username")
+	userFiles, err := dblayer.QueryUserFileMetas(username, limitCnt)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(userFiles)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -145,4 +176,12 @@ func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	meta.RemoveFileMeta(fileSha1)
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	// 1. 解析请求参数
+	// 2. 从文件表中查询相同hash的文件记录
+	// 3. 查不到记录则秒传失败
+	// 4. 上传过则将文件写入用户文件表，返回成功
 }
