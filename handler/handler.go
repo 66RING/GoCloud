@@ -180,8 +180,49 @@ func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
+
 	// 1. 解析请求参数
+	username := r.Form.Get("username")
+	filehash := r.Form.Get("filehash")
+	filename := r.Form.Get("filename")
+	filesize, _ := strconv.Atoi(r.Form.Get("filesize"))
+
 	// 2. 从文件表中查询相同hash的文件记录
+	fileMeta, err := meta.GetFileMetaDB(filehash)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		resp := util.RespMsg{
+			Code: -1,
+			Msg:  err.Error(),
+		}
+		w.Write(resp.JSONBytes())
+		return
+	}
+
 	// 3. 查不到记录则秒传失败
+	if fileMeta.FileName == "" {
+		resp := util.RespMsg{
+			Code: -1,
+			Msg:  "秒传失败, 文件名为空",
+		}
+		w.Write(resp.JSONBytes())
+		return
+	}
+
 	// 4. 上传过则将文件写入用户文件表，返回成功
+	suc := dblayer.OnUserFileUploadFinished(username, filehash, filename, int64(filesize))
+	if suc {
+		resp := util.RespMsg{
+			Code: 0,
+			Msg:  "秒传成功",
+		}
+		w.Write(resp.JSONBytes())
+		return
+	} else {
+		resp := util.RespMsg{
+			Code: -1,
+			Msg:  "秒传失败，写入数据库失败",
+		}
+		w.Write(resp.JSONBytes())
+	}
 }

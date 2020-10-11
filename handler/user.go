@@ -46,7 +46,6 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 // 登录接口
 func SignInHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("some one call this")
 
 	// 跨域问题
 	w.Header().Set("Access-Control-Allow-Origin", "*")  //允许访问所有域
