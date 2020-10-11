@@ -11,6 +11,14 @@ type RespMsg struct {
 	Data interface{} `json:"data"`
 }
 
+func NewRespMsg(code int, msg string, data interface{}) *RespMsg {
+	return &RespMsg{
+		Code: code,
+		Msg:  msg,
+		Data: data,
+	}
+}
+
 // 对象转换成json格式二进制数组
 func (resp *RespMsg) JSONBytes() []byte {
 	r, err := json.Marshal(resp)
