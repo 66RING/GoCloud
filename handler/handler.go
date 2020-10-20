@@ -3,6 +3,7 @@ package handler
 import (
 	dblayer "GoCloud/db"
 	"GoCloud/meta"
+	"GoCloud/store/oss"
 	"GoCloud/util"
 	"encoding/json"
 	"fmt"
@@ -55,6 +56,20 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		// 计算较大文件哈希耗时较长，影响上传速度和用户体验。可以抽离出来做微服务，然后进行异步处理
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
+
+		// TODO
+		// 写入ceph 或 写入OSS
+
+		ossPath := "oss/" + fileMeta.FileSha1
+		// err = oss.Bucket().PutObject(ossPath, file)
+		err = oss.Bucket().PutObjectFromFile(ossPath, fileMeta.Location)
+		if err != nil {
+			fmt.Println(err.Error())
+			w.Write([]byte("Upload to oss failed"))
+			return
+		}
+		fileMeta.Location = ossPath
+
 		// meta.UpdateFileMeta(fileMeta)
 		_ = meta.UpdateFileMetaDB(fileMeta)
 
@@ -225,4 +240,15 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Write(resp.JSONBytes())
 	}
+}
+
+func DownloadURLhandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	filehash := r.Form.Get("filehash")
+	row, _ := dblayer.GetFileMeta(filehash)
+
+	// TODO 判断文件存在oss还是ceph
+
+	signedURL := oss.DownloadUrl(row.FileAddr.String)
+	w.Write([]byte(signedURL))
 }
