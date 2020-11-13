@@ -2,20 +2,36 @@ package main
 
 import (
 	"GoCloud/handler"
+	"GoCloud/middleware"
 	"fmt"
 	"net/http"
 )
 
+// TODO 手动实现中间件
+// 手动添加的cors有：signin，upload/suc，delete，download，update
+
 func main() {
-	http.HandleFunc("/file/upload", handler.UploadHandler)
-	http.HandleFunc("/file/upload/suc", handler.UploadSucHandler)
+	r := middleware.New()
+	r.Use(middleware.Cors)
+
+	r.POST("/file/upload", handler.UploadHandler)
+	r.POST("/file/update", handler.FileMetaUpdateHandler)
+
+	r.ANY("/file/upload/suc", handler.UploadSucHandler)
+	r.ANY("/file/delete", handler.FileDeleteHandler)
+	r.ANY("/file/download", handler.DownloadHandler)
+	r.ANY("/file/query", handler.FileQueryHandler)
+	r.ANY("/file/downloadurl", handler.DownloadURLhandler)
+
+	// http.HandleFunc("/file/upload", handler.UploadHandler)
+	// http.HandleFunc("/file/upload/suc", handler.UploadSucHandler)
 	http.HandleFunc("/file/fastupload", handler.HTTPInterceptor(handler.TryFastUploadHandler))
 	http.HandleFunc("/file/meta", handler.GetFileMetaHandler)
-	http.HandleFunc("/file/download", handler.DownloadHandler)
-	http.HandleFunc("/file/update", handler.FileMetaUpdateHandler)
-	http.HandleFunc("/file/delete", handler.FileDeleteHandler)
-	http.HandleFunc("/file/query", handler.FileQueryHandler)
-	http.HandleFunc("/file/downloadurl", handler.DownloadURLhandler)
+	// http.HandleFunc("/file/download", handler.DownloadHandler)
+	// http.HandleFunc("/file/update", handler.FileMetaUpdateHandler)
+	// http.HandleFunc("/file/delete", handler.FileDeleteHandler)
+	// http.HandleFunc("/file/query", handler.FileQueryHandler)
+	// http.HandleFunc("/file/downloadurl", handler.DownloadURLhandler)
 
 	http.HandleFunc("/user/signup", handler.SignupHandler)
 	http.HandleFunc("/user/signin", handler.SignInHandler)

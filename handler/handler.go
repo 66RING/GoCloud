@@ -16,73 +16,68 @@ import (
 )
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		//返回上传的html页面
-		data, err := ioutil.ReadFile("./static/view/index.html")
-		if err != nil {
-			io.WriteString(w, "inter err")
-			return
-		}
-		io.WriteString(w, string(data))
-	} else if r.Method == "POST" {
-		// 接受文件流及存储到本地目录
-		file, head, err := r.FormFile("file")
-		if err != nil {
-			fmt.Println("fail to get data", err.Error())
-			return
-		}
-		defer file.Close()
+	// 接受文件流及存储到本地目录
+	file, head, err := r.FormFile("file")
+	if err != nil {
+		fmt.Println("fail to get data", err.Error())
+		return
+	}
+	defer file.Close()
 
-		fileMeta := meta.FileMeta{
-			FileName: head.Filename,
-			Location: "/tmp/" + head.Filename,
-			UploadAt: time.Now().Format("2006-01-02 15:04:05"), // go里面一个特殊时间点
-		}
+	fileMeta := meta.FileMeta{
+		FileName: head.Filename,
+		Location: "/home/ring/tem/GoCloud/" + head.Filename,
+		UploadAt: time.Now().Format("2006-01-02 15:04:05"), // go里面一个特殊时间点
+	}
 
-		newFile, err := os.Create(fileMeta.Location)
-		if err != nil {
-			fmt.Println("fail to create file, ", err.Error())
-			return
-		}
-		defer newFile.Close()
+	newFile, err := os.Create(fileMeta.Location)
+	if err != nil {
+		fmt.Println("fail to create file, ", err.Error())
+		return
+	}
+	defer newFile.Close()
 
-		// target, source
-		fileMeta.FileSize, err = io.Copy(newFile, file)
-		if err != nil {
-			fmt.Println("fail to save date, ", err.Error())
-			return
-		}
+	// target, source
+	fileMeta.FileSize, err = io.Copy(newFile, file)
+	if err != nil {
+		fmt.Println("fail to save date, ", err.Error())
+		return
+	}
 
-		// 计算较大文件哈希耗时较长，影响上传速度和用户体验。可以抽离出来做微服务，然后进行异步处理
-		newFile.Seek(0, 0)
-		fileMeta.FileSha1 = util.FileSha1(newFile)
+	// 计算较大文件哈希耗时较长，影响上传速度和用户体验。可以抽离出来做微服务，然后进行异步处理
+	newFile.Seek(0, 0)
+	fileMeta.FileSha1 = util.FileSha1(newFile)
 
-		// TODO
-		// 写入ceph 或 写入OSS
+	// TODO
+	// 写入ceph 或 写入OSS
 
-		ossPath := "oss/" + fileMeta.FileSha1
-		// err = oss.Bucket().PutObject(ossPath, file)
-		err = oss.Bucket().PutObjectFromFile(ossPath, fileMeta.Location)
-		if err != nil {
-			fmt.Println(err.Error())
-			w.Write([]byte("Upload to oss failed"))
-			return
-		}
-		fileMeta.Location = ossPath
+	ossPath := "oss/" + fileMeta.FileSha1
+	// err = oss.Bucket().PutObject(ossPath, file)
+	err = oss.Bucket().PutObjectFromFile(ossPath, fileMeta.Location)
+	if err != nil {
+		fmt.Println(err.Error())
+		w.Write([]byte("Upload to oss failed"))
+		return
+	}
 
-		// meta.UpdateFileMeta(fileMeta)
-		_ = meta.UpdateFileMetaDB(fileMeta)
+	// 更新到数据库同时更新到内存
+	meta.UpdateFileMeta(fileMeta)
 
-		// 写唯一文件表同时写用户文件表 //
-		r.ParseForm()
-		username := r.Form.Get("username")
-		suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1,
-			fileMeta.FileName, fileMeta.FileSize)
-		if suc {
-			http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
-		} else {
-			w.Write([]byte("Upload Failed."))
-		}
+	fileMeta.Location = ossPath
+	ok := meta.UpdateFileMetaDB(fileMeta)
+	if !ok {
+		fmt.Print("更新文件到数据库失败")
+	}
+
+	// 写唯一文件表同时写用户文件表 //
+	r.ParseForm()
+	username := r.Form.Get("username")
+	suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1,
+		fileMeta.FileName, fileMeta.FileSize)
+	if suc {
+		http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
+	} else {
+		w.Write([]byte("Upload Failed."))
 	}
 }
 
@@ -135,6 +130,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	f, err := os.Open(fm.Location)
 	if err != nil {
+		fmt.Println("open error: ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -143,6 +139,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	// 文件很小就直接全部加载到内存了
 	data, err := ioutil.ReadAll(f)
 	if err != nil {
+		fmt.Println("io error", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	w.Header().Set("Content-Type", "application/octect-stream")
@@ -160,10 +157,6 @@ func FileMetaUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	if opType != "0" {
 		w.WriteHeader(http.StatusForbidden) // 403
-		return
-	}
-	if r.Method != "POST" {
-		w.WriteHeader(http.StatusMethodNotAllowed) // 405
 		return
 	}
 

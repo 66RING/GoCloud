@@ -1,4 +1,4 @@
-# TODO 
+## TODO 
 
 - 首页
 - 登录页面
@@ -9,6 +9,9 @@
 
 - 分块上传取消
 - 分块上传进度
+
+- metalink, http, ftp, bt三路下载
+- mirror brain, 就近服务器获取
 
 ## 开发日志/技术总结 
 
