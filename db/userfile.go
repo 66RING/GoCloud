@@ -32,6 +32,21 @@ func OnUserFileUploadFinished(username, filehash, filename string, filesize int6
 	return true
 }
 
+func OnUserFileDelete(username, filehash string) bool {
+	stmt, err := mydb.DBConn().Prepare("delete from tbl_user_file where user_name=? and file_sha1=?")
+	if err != nil {
+		fmt.Println(err.Error())
+		return false
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(username, filehash)
+	if err != nil {
+		fmt.Println(err.Error())
+		return false
+	}
+	return true
+}
+
 // 批量获取用户文件信息
 func QueryUserFileMetas(username string, limit int) ([]UserFile, error) {
 	stmt, err := mydb.DBConn().Prepare("select id, file_sha1, file_name, file_size, upload_at, last_update from " +

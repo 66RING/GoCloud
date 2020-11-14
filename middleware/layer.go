@@ -41,8 +41,7 @@ func (r *Router) ANY(route string, h http.HandlerFunc) {
 }
 
 func (r *Router) GET(route string, h http.HandlerFunc) {
-	mergeHandler := r.merge(h)
-	mergeHandler = func(h http.HandlerFunc) http.HandlerFunc {
+	mergeHandler := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
 				//返回一个静态页面
@@ -58,13 +57,13 @@ func (r *Router) GET(route string, h http.HandlerFunc) {
 			}
 		}
 	}(h)
+	mergeHandler = r.merge(mergeHandler)
 	r.router[route] = mergeHandler
 	http.HandleFunc(route, mergeHandler)
 }
 
 func (r *Router) POST(route string, h http.HandlerFunc) {
-	mergeHandler := r.merge(h)
-	mergeHandler = func(h http.HandlerFunc) http.HandlerFunc {
+	mergeHandler := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "POST" {
 				//返回一个静态页面
@@ -80,6 +79,7 @@ func (r *Router) POST(route string, h http.HandlerFunc) {
 			}
 		}
 	}(h)
+	mergeHandler = r.merge(mergeHandler)
 	r.router[route] = mergeHandler
 	http.HandleFunc(route, mergeHandler)
 }

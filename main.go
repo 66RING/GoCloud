@@ -13,8 +13,9 @@ import (
 func main() {
 	r := middleware.New()
 	r.Use(middleware.Cors)
+	r.Use(middleware.Logger)
 
-	r.POST("/file/upload", handler.UploadHandler)
+	r.ANY("/file/upload", handler.UploadHandler)
 	r.POST("/file/update", handler.FileMetaUpdateHandler)
 
 	r.ANY("/file/upload/suc", handler.UploadSucHandler)

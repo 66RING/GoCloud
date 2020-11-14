@@ -66,7 +66,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	fileMeta.Location = ossPath
 	ok := meta.UpdateFileMetaDB(fileMeta)
 	if !ok {
-		fmt.Print("更新文件到数据库失败")
+		fmt.Println("更新文件到数据库失败")
 	}
 
 	// 写唯一文件表同时写用户文件表 //
@@ -75,7 +75,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	suc := dblayer.OnUserFileUploadFinished(username, fileMeta.FileSha1,
 		fileMeta.FileName, fileMeta.FileSize)
 	if suc {
-		http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
+		// http.Redirect(w, r, "/file/upload/suc", http.StatusFound)
 	} else {
 		w.Write([]byte("Upload Failed."))
 	}
@@ -130,12 +130,13 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	f, err := os.Open(fm.Location)
 	if err != nil {
-		fmt.Println("open error: ", err.Error())
+		fmt.Println("Download from local fail: ", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	defer f.Close()
 
+	fmt.Println("Downloading from local...")
 	// 文件很小就直接全部加载到内存了
 	data, err := ioutil.ReadAll(f)
 	if err != nil {
@@ -177,13 +178,23 @@ func FileMetaUpdateHandler(w http.ResponseWriter, r *http.Request) {
 func FileDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	fileSha1 := r.Form.Get("filehash")
+	username := r.Form.Get("username")
 	// 删除先取出位置，在系统中删除
 	fMeta := meta.GetFileMeta(fileSha1)
 	os.Remove(fMeta.Location)
+	ok := dblayer.OnUserFileDelete(username, fileSha1)
+	if !ok {
+		fmt.Println("Delete from tbl_user_file fail")
+	}
 
 	meta.RemoveFileMeta(fileSha1)
 
+	resp := util.RespMsg{
+		Code: 0,
+		Msg:  "OK",
+	}
 	w.WriteHeader(http.StatusOK)
+	w.Write(resp.JSONBytes())
 }
 
 func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -243,5 +254,6 @@ func DownloadURLhandler(w http.ResponseWriter, r *http.Request) {
 	// TODO 判断文件存在oss还是ceph
 
 	signedURL := oss.DownloadUrl(row.FileAddr.String)
+	fmt.Println("Downloading from oss...")
 	w.Write([]byte(signedURL))
 }
