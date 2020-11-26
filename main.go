@@ -7,13 +7,10 @@ import (
 	"net/http"
 )
 
-// TODO 手动实现中间件
-// 手动添加的cors有：signin，upload/suc，delete，download，update
-
 func main() {
 	r := middleware.New()
 	r.Use(middleware.Cors)
-	r.Use(middleware.Logger)
+	// r.Use(middleware.Logger)
 
 	r.ANY("/file/upload", handler.UploadHandler)
 	r.POST("/file/update", handler.FileMetaUpdateHandler)

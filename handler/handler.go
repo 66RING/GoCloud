@@ -131,7 +131,9 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	f, err := os.Open(fm.Location)
 	if err != nil {
 		fmt.Println("Download from local fail: ", err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		// 返回空数据表示没找到
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte{})
 		return
 	}
 	defer f.Close()

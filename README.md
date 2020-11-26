@@ -1,7 +1,6 @@
 ## TODO 
 
 - 首页
-- 登录页面
 - 注册页面
 - USE GIN TO REBUILD
 
